@@ -82,8 +82,8 @@ export class ProductsService {
   }
 
   /**
-   * Deletes the product with its variants. Billed products / variants are protected by
-   * RESTRICT foreign keys (409 IN_USE — deactivate instead); add purchase checks here later.
+   * Deletes the product with its variants. Products / variants on bills or purchase orders are
+   * protected by RESTRICT foreign keys (409 IN_USE — deactivate instead).
    */
   async remove(id: string): Promise<void> {
     if (!(await this.products.delete(id))) {

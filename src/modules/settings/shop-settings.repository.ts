@@ -47,4 +47,23 @@ export class ShopSettingsRepository {
     );
     return result.rows[0];
   }
+
+  /** The logo data URL, or '' when none is set. */
+  async getLogo(): Promise<string> {
+    const result = await this.db.query<{ logo: string }>(
+      'SELECT logo FROM shop_settings WHERE id = 1',
+    );
+    return result.rows[0]?.logo ?? '';
+  }
+
+  /** Replaces the logo ('' removes it). */
+  async saveLogo(logo: string): Promise<string> {
+    const result = await this.db.query<{ logo: string }>(
+      `INSERT INTO shop_settings (id, logo) VALUES (1, $1)
+       ON CONFLICT (id) DO UPDATE SET logo = EXCLUDED.logo
+       RETURNING logo`,
+      [logo],
+    );
+    return result.rows[0]?.logo ?? '';
+  }
 }

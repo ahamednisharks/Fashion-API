@@ -62,9 +62,13 @@ export async function resetDatabase(): Promise<void> {
   await pool.query(
     `TRUNCATE categories, brands, sizes, colors, suppliers, customers, products, product_variants,
               users, user_sessions, sales_invoices, sales_invoice_items, sales_invoice_payments,
-              invoice_counters, shop_settings RESTART IDENTITY CASCADE`,
+              invoice_counters, shop_settings, purchase_orders, purchase_order_items,
+              purchase_entries, purchase_entry_items, stock_adjustments, stock_adjustment_items,
+              stock_movements, stock_levels,
+              document_counters, barcode_settings RESTART IDENTITY CASCADE`,
   );
   await pool.query('INSERT INTO shop_settings (id) VALUES (1)');
+  await pool.query('INSERT INTO barcode_settings (id) VALUES (1)');
   await runSeeds();
   // Tests start from an admin that has already replaced the temporary password.
   await pool.query('UPDATE users SET must_change_password = false WHERE username = $1', [

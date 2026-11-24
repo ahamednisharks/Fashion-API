@@ -44,6 +44,9 @@ export const sellableItemSchema = z
     mrp: z.number(),
     unitPrice: z.number().describe('Selling price (GST inclusive) after variant overrides.'),
     status: statusEnum.describe('Product status — inactive items cannot be billed.'),
+    stock: z
+      .number()
+      .describe('Quantity in hand (may be below zero when goods were sold before being entered).'),
   })
   .meta({ id: 'SellableItem' });
 export type SellableItem = z.infer<typeof sellableItemSchema>;

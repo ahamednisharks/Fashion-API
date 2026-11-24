@@ -87,6 +87,90 @@ export const CONSTRAINT_MESSAGES: Readonly<Record<string, ConstraintMessage>> = 
       'A variant that has been billed cannot be deleted. Keep the variant, or deactivate the product instead.',
   },
 
+  // Purchase orders — kept for records (cancel instead of delete), so their masters can only be
+  // deactivated.
+  purchase_orders_supplier_id_fkey: {
+    field: 'supplierId',
+    message: 'The selected supplier does not exist.',
+    inUseMessage:
+      'This supplier has purchase orders and cannot be deleted. Deactivate the supplier instead.',
+  },
+  purchase_orders_created_by_fkey: {
+    message: 'The user does not exist.',
+    inUseMessage:
+      'This user has created purchase orders and cannot be deleted. Deactivate the account instead.',
+  },
+  purchase_order_items_product_id_fkey: {
+    field: 'productId',
+    message: 'The product does not exist.',
+    inUseMessage:
+      'This product is on purchase orders and cannot be deleted. Deactivate it instead.',
+  },
+  purchase_order_items_variant_id_fkey: {
+    field: 'variantId',
+    message: 'The variant does not exist.',
+    inUseMessage:
+      'A variant that is on purchase orders cannot be deleted. Keep the variant, or deactivate the product instead.',
+  },
+  purchase_orders_expected_date_check: {
+    field: 'expectedDate',
+    message: 'Expected date cannot be before the PO date.',
+  },
+
+  // Purchase entries — kept for records (cancel instead of delete), like purchase orders.
+  purchase_entries_supplier_id_fkey: {
+    field: 'supplierId',
+    message: 'The selected supplier does not exist.',
+    inUseMessage:
+      'This supplier has purchase entries and cannot be deleted. Deactivate the supplier instead.',
+  },
+  purchase_entries_created_by_fkey: {
+    message: 'The user does not exist.',
+    inUseMessage:
+      'This user has created purchase entries and cannot be deleted. Deactivate the account instead.',
+  },
+  purchase_entries_po_id_fkey: {
+    field: 'purchaseOrderId',
+    message: 'The selected purchase order does not exist.',
+    inUseMessage: 'Goods have been received against this purchase order.',
+  },
+  purchase_entry_items_product_id_fkey: {
+    field: 'productId',
+    message: 'The product does not exist.',
+    inUseMessage:
+      'This product is on purchase entries and cannot be deleted. Deactivate it instead.',
+  },
+  purchase_entry_items_variant_id_fkey: {
+    field: 'variantId',
+    message: 'The variant does not exist.',
+    inUseMessage:
+      'A variant that is on purchase entries cannot be deleted. Keep the variant, or deactivate the product instead.',
+  },
+  purchase_entries_supplier_invoice_key: {
+    field: 'supplierInvoiceNo',
+    message: 'This supplier invoice has already been entered this financial year.',
+  },
+  purchase_entries_supplier_invoice_date_check: {
+    field: 'supplierInvoiceDate',
+    message: 'The supplier invoice date cannot be after the received date.',
+  },
+  purchase_entry_items_selling_price_check: {
+    message: 'Selling price cannot be more than MRP.',
+  },
+
+  // Stock — movements keep the item (deactivate instead of deleting).
+  stock_movements_product_id_fkey: {
+    field: 'productId',
+    message: 'The product does not exist.',
+    inUseMessage: 'This product has stock movements and cannot be deleted. Deactivate it instead.',
+  },
+  stock_movements_variant_id_fkey: {
+    field: 'variantId',
+    message: 'The variant does not exist.',
+    inUseMessage:
+      'A variant with stock movements cannot be deleted. Keep the variant, or deactivate the product instead.',
+  },
+
   // Checks
   products_selling_price_check: {
     field: 'sellingPrice',

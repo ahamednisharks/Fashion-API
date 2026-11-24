@@ -148,6 +148,50 @@ describe('shop profile', () => {
     const denied = await staff.put('/settings/shop', { shopName: 'Hacked' });
     assert.equal(denied.status, 403);
   });
+
+  it('keeps a logo that an admin uploads, replaces and removes', async () => {
+    // 1×1 PNG.
+    const png =
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+    const none = await api.get<{ logo: string }>('/settings/shop/logo');
+    assert.equal(none.status, 200);
+    assert.equal(none.body.data.logo, '');
+
+    const saved = await api.put<{ logo: string }>('/settings/shop/logo', { logo: png });
+    assert.equal(saved.status, 200, JSON.stringify(saved.body));
+    assert.equal(saved.body.data.logo, png);
+    assert.equal((await api.get<{ logo: string }>('/settings/shop/logo')).body.data.logo, png);
+
+    // The profile (snapshotted on every bill) does not carry the logo, and saving it keeps the logo.
+    const profile = await api.get<Record<string, unknown>>('/settings/shop');
+    assert.equal('logo' in profile.body.data, false);
+    await api.put('/settings/shop', { shopName: 'Kachi Fashions', state: 'Tamil Nadu' });
+    assert.equal((await api.get<{ logo: string }>('/settings/shop/logo')).body.data.logo, png);
+
+    const rejected = [
+      'data:image/svg+xml;base64,PHN2Zy8+',
+      png.replace('image/png', 'image/jpeg'), // PNG bytes declared as JPEG
+      'data:image/png;base64,bm90IGFuIGltYWdl', // "not an image"
+      `data:image/png;base64,${Buffer.concat([
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+        Buffer.alloc(300 * 1024),
+      ]).toString('base64')}`, // over 256 KB
+      '',
+    ];
+    for (const logo of rejected) {
+      const response = await api.put('/settings/shop/logo', { logo });
+      assert.equal(response.status, 400, logo.slice(0, 40));
+      assert.equal(response.body.error.field, 'logo');
+    }
+
+    const staff = await createStaffClient('counter3');
+    assert.equal((await staff.get<{ logo: string }>('/settings/shop/logo')).body.data.logo, png);
+    assert.equal((await staff.put('/settings/shop/logo', { logo: png })).status, 403);
+    assert.equal((await staff.delete('/settings/shop/logo')).status, 403);
+
+    assert.equal((await api.delete('/settings/shop/logo')).status, 204);
+    assert.equal((await api.get<{ logo: string }>('/settings/shop/logo')).body.data.logo, '');
+  });
 });
 
 describe('item lookup (scanner)', () => {

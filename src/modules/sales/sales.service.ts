@@ -3,6 +3,7 @@ import { AppError } from '../../common/errors/app-error.js';
 import type { Paged } from '../../common/utils/pagination.js';
 import { stateFromGstin } from '../../common/validators/gstin.js';
 import { ShopSettingsRepository } from '../settings/shop-settings.repository.js';
+import { StockService } from '../stock/stock.service.js';
 import type { ShopProfile } from '../settings/shop-settings.schema.js';
 import { type SupplyType, calculateBill, formatRupees, settlePayments } from './bill-calculator.js';
 import { financialYearOf, formatInvoiceNo } from './invoice-number.js';
@@ -41,6 +42,7 @@ export class SalesService {
   constructor(
     private readonly sales = new SalesRepository(),
     private readonly settings = new ShopSettingsRepository(),
+    private readonly stock = new StockService(),
   ) {}
 
   lookupItems(query: ItemLookupQuery): Promise<SellableItem[]> {
@@ -88,8 +90,9 @@ export class SalesService {
       const financialYear = financialYearOf(invoiceDate);
       const sequenceNo = await this.sales.nextSequence(tx, financialYear);
 
+      const invoiceNo = formatInvoiceNo(financialYear, sequenceNo);
       const id = await this.sales.insertInvoice(tx, {
-        invoiceNo: formatInvoiceNo(financialYear, sequenceNo),
+        invoiceNo,
         financialYear,
         sequenceNo,
         invoiceDate,
@@ -108,6 +111,17 @@ export class SalesService {
         })),
         payments: input.payments,
       });
+      // Sold goods leave stock (it may go below zero — goods sold before being entered).
+      await this.stock.record(
+        tx,
+        { type: 'sales_invoice', id, no: invoiceNo, date: invoiceDate, kind: 'sale' },
+        lines.map(({ input: line, item }, index) => ({
+          productId: item.productId,
+          variantId: item.variantId,
+          lineNo: index + 1,
+          quantity: -line.quantity,
+        })),
+      );
       return (await this.sales.findById(id, tx)) ?? notFound();
     });
   }

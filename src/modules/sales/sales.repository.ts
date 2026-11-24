@@ -2,6 +2,7 @@ import { type Queryable, type TransactionClient, pool } from '../../config/datab
 import { type Paged, offsetOf, toPaged } from '../../common/utils/pagination.js';
 import { SqlParams, searchConditions, whereClause } from '../../common/utils/sql.js';
 import type { BillLineAmounts, BillTotals, SupplyType } from './bill-calculator.js';
+import { ITEM_COLUMNS, ITEM_FROM, ITEM_ORDER, itemSelect } from '../items/item-sql.js';
 import type { ShopProfile } from '../settings/shop-settings.schema.js';
 import type {
   Invoice,
@@ -15,34 +16,6 @@ import type {
 
 /** Bills are dated in the shop's local time. */
 export const SHOP_TIME_ZONE = 'Asia/Kolkata';
-
-/**
- * Sellable rows: one per variant, or one per product that has no variants
- * (the LEFT JOIN yields a single row with NULL variant columns).
- */
-const ITEM_COLUMNS = `
-  p.id AS "productId", v.id AS "variantId",
-  p.name AS "productName", p.code AS "productCode", p.product_type AS "productType",
-  COALESCE(b.name, '') AS "brandName",
-  COALESCE(v.design_no, '') AS "designNo",
-  COALESCE(s.name, '') AS "sizeName",
-  COALESCE(co.name, '') AS "colorName",
-  COALESCE(co.hex_code, '') AS "colorHex",
-  COALESCE(v.sku, p.code) AS sku,
-  CASE WHEN v.id IS NULL THEN p.barcode ELSE v.barcode END AS barcode,
-  p.hsn_code AS "hsnCode", p.gst_rate AS "gstRate",
-  COALESCE(v.mrp, p.mrp) AS mrp,
-  COALESCE(v.selling_price, p.selling_price) AS "unitPrice",
-  p.status`;
-
-const ITEM_FROM = `
-  FROM products p
-  LEFT JOIN brands b ON b.id = p.brand_id
-  LEFT JOIN product_variants v ON v.product_id = p.id
-  LEFT JOIN sizes s ON s.id = v.size_id
-  LEFT JOIN colors co ON co.id = v.color_id`;
-
-const ITEM_ORDER = 'ORDER BY lower(p.name), p.id, v.position, v.created_at, v.id';
 
 const SUMMARY_COLUMNS = `
   si.id, si.invoice_no AS "invoiceNo", si.invoice_date::text AS "invoiceDate",
@@ -109,11 +82,15 @@ export class SalesRepository {
   /**
    * Exact match for a scanned / typed code: variant barcode or SKU, product barcode or product
    * code (the last two return every variant of that product). Inactive products are included so
-   * the counter can say why an item cannot be billed.
+   * the counter can say why an item cannot be billed. `extraColumns` adds columns to each row
+   * (purchase screens add the purchase price).
    */
-  async lookupItems(code: string): Promise<SellableItem[]> {
-    const result = await this.db.query<SellableItem>(
-      `SELECT ${ITEM_COLUMNS} ${ITEM_FROM}
+  async lookupItems<T extends SellableItem = SellableItem>(
+    code: string,
+    extraColumns = '',
+  ): Promise<T[]> {
+    const result = await this.db.query<T>(
+      `${itemSelect(extraColumns)}
         WHERE (v.barcode <> '' AND lower(v.barcode) = $1)
            OR lower(v.sku) = $1
            OR (p.barcode <> '' AND lower(p.barcode) = $1)
@@ -126,7 +103,11 @@ export class SalesRepository {
   }
 
   /** Active items whose text contains every search word. */
-  async searchItems(search: string, limit: number): Promise<SellableItem[]> {
+  async searchItems<T extends SellableItem = SellableItem>(
+    search: string,
+    limit: number,
+    extraColumns = '',
+  ): Promise<T[]> {
     const params = new SqlParams();
     const conditions = searchConditions(
       params,
@@ -136,8 +117,8 @@ export class SalesRepository {
                    s.name, co.name) ILIKE ${p}`,
     );
     conditions.push(`p.status = 'active'`);
-    const result = await this.db.query<SellableItem>(
-      `SELECT ${ITEM_COLUMNS} ${ITEM_FROM} ${whereClause(conditions)}
+    const result = await this.db.query<T>(
+      `${itemSelect(extraColumns)} ${whereClause(conditions)}
         ${ITEM_ORDER}
         LIMIT ${params.add(limit)}`,
       params.values,
@@ -145,7 +126,7 @@ export class SalesRepository {
     return result.rows;
   }
 
-  /** All sellable rows of these products (for validating a bill). */
+  /** All sellable rows of these products (for validating a bill or a purchase order). */
   async findItemsOfProducts(db: Queryable, productIds: readonly string[]): Promise<SellableItem[]> {
     const result = await db.query<SellableItem>(
       `SELECT ${ITEM_COLUMNS} ${ITEM_FROM} WHERE p.id = ANY($1::uuid[]) ${ITEM_ORDER}`,
